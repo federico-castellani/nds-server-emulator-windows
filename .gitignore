@@ -1,0 +1,19 @@
+# .NET / WinUI
+bin/
+obj/
+*.user
+.vs/
+
+# Native core build output
+native/build/
+src/NdsStation/native-bin/
+
+# Packaged app
+dist/
+
+# Python
+__pycache__/
+
+# OS
+Thumbs.db
+.DS_Store

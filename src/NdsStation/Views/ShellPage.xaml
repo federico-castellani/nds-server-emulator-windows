@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="NdsStation.Views.ShellPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <NavigationView x:Name="NavView"
+                    IsBackButtonVisible="Collapsed"
+                    IsPaneToggleButtonVisible="True"
+                    PaneDisplayMode="Auto"
+                    OpenPaneLength="260"
+                    IsSettingsVisible="True"
+                    SelectionChanged="OnSelectionChanged"
+                    ItemInvoked="OnItemInvoked">
+        <NavigationView.MenuItems>
+            <NavigationViewItem x:Name="LibraryItem" Content="Libreria" Tag="library" IsSelected="True">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE8F1;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem x:Name="AdminItem" Content="Amministrazione" Tag="admin" Visibility="Collapsed">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE7EF;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+        </NavigationView.MenuItems>
+
+        <NavigationView.FooterMenuItems>
+            <NavigationViewItem x:Name="AccountItem" SelectsOnInvoked="False">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE77B;" />
+                </NavigationViewItem.Icon>
+                <FlyoutBase.AttachedFlyout>
+                    <MenuFlyout Placement="RightEdgeAlignedBottom">
+                        <MenuFlyoutItem x:Name="AccountHeader" IsEnabled="False" />
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutItem Text="Cambia password" Click="OnChangePassword">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE8D7;" />
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Text="Esci" Click="OnSignOut">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xF3B1;" />
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                    </MenuFlyout>
+                </FlyoutBase.AttachedFlyout>
+            </NavigationViewItem>
+        </NavigationView.FooterMenuItems>
+
+        <Frame x:Name="ContentFrame" />
+    </NavigationView>
+</Page>

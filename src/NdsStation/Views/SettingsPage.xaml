@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="NdsStation.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:NdsStation.Views">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Padding="36,24,36,36" MaxWidth="1000" HorizontalAlignment="Stretch">
+            <TextBlock Text="Impostazioni" Style="{StaticResource PageTitleStyle}" />
+
+            <!-- Appearance -->
+            <TextBlock Text="Aspetto" Style="{StaticResource SectionHeaderStyle}" />
+            <local:SettingRow Header="Tema dell'app" Description="Scegli tra chiaro, scuro o quello di Windows" Glyph="&#xE790;">
+                <ComboBox x:Name="ThemeCombo" MinWidth="180" SelectionChanged="OnThemeChanged">
+                    <ComboBoxItem Content="Usa impostazione di Windows" />
+                    <ComboBoxItem Content="Chiaro" />
+                    <ComboBoxItem Content="Scuro" />
+                </ComboBox>
+            </local:SettingRow>
+
+            <!-- Screen -->
+            <TextBlock Text="Schermo" Style="{StaticResource SectionHeaderStyle}" />
+            <local:SettingRow Header="Disposizione schermi" Description="Puoi cambiarla anche durante il gioco" Glyph="&#xE7F4;">
+                <ComboBox x:Name="LayoutCombo" MinWidth="180" SelectionChanged="OnLayoutChanged">
+                    <ComboBoxItem Content="Verticale" />
+                    <ComboBoxItem Content="Affiancati" />
+                    <ComboBoxItem Content="Superiore grande" />
+                </ComboBox>
+            </local:SettingRow>
+            <local:SettingRow Header="Scala intera" Description="Pixel nitidi e regolari, con bordi più ampi" Glyph="&#xE71E;">
+                <ToggleSwitch x:Name="IntegerScalingToggle" OnContent="Attiva" OffContent="Disattiva" Toggled="OnIntegerScalingToggled" />
+            </local:SettingRow>
+
+            <!-- Audio -->
+            <TextBlock Text="Audio" Style="{StaticResource SectionHeaderStyle}" />
+            <local:SettingRow Header="Volume" Glyph="&#xE767;">
+                <Slider x:Name="VolumeSlider" Width="200" Minimum="0" Maximum="100" StepFrequency="1" ValueChanged="OnVolumeChanged" />
+            </local:SettingRow>
+            <local:SettingRow Header="Velocità avanti veloce" Description="Tieni premuto Spazio (o il grilletto destro) durante il gioco" Glyph="&#xEB9D;">
+                <ComboBox x:Name="FastForwardCombo" MinWidth="180" SelectionChanged="OnFastForwardChanged">
+                    <ComboBoxItem Content="2×" Tag="2" />
+                    <ComboBoxItem Content="3×" Tag="3" />
+                    <ComboBoxItem Content="4×" Tag="4" />
+                    <ComboBoxItem Content="Illimitata" Tag="0" />
+                </ComboBox>
+            </local:SettingRow>
+
+            <!-- Controls -->
+            <TextBlock Text="Controlli" Style="{StaticResource SectionHeaderStyle}" />
+            <local:SettingRow x:Name="GamepadRow" Header="Controller" Glyph="&#xE7FC;">
+                <ComboBox x:Name="PadLayoutCombo" MinWidth="180" SelectionChanged="OnPadLayoutChanged">
+                    <ComboBoxItem Content="Per posizione (come il DS)" />
+                    <ComboBoxItem Content="Per etichetta (come Xbox)" />
+                </ComboBox>
+            </local:SettingRow>
+            <Border Style="{StaticResource CardBorderStyle}" Padding="16" CornerRadius="{StaticResource ControlCornerRadius}">
+                <StackPanel Spacing="12">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <FontIcon Glyph="&#xE765;" FontSize="20" />
+                            <StackPanel>
+                                <TextBlock Text="Tastiera" />
+                                <TextBlock Text="Fai clic su un tasto e premi quello che vuoi usare" Style="{StaticResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                        <Button Content="Ripristina predefiniti" HorizontalAlignment="Right" Click="OnResetKeys" />
+                    </Grid>
+                    <ItemsRepeater x:Name="KeyBindingsRepeater" Margin="36,4,0,0">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="200" MinColumnSpacing="12" MinRowSpacing="8" ItemsStretch="Fill" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="local:KeyBindingItem">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="80" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind Label}" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" HorizontalAlignment="Stretch" Content="{x:Bind KeyName, Mode=OneWay}"
+                                            Tag="{x:Bind}" Click="OnRebindKey" FontFamily="Consolas" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                    <TextBlock Margin="36,4,0,0" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="Scorciatoie: Spazio avanti veloce · P pausa · F5 salva stato · F8 carica stato · F11 schermo intero · Esc esci dallo schermo intero" />
+                </StackPanel>
+            </Border>
+
+            <!-- Online -->
+            <TextBlock Text="Online (Nintendo Wi-Fi Connection)" Style="{StaticResource SectionHeaderStyle}" />
+            <local:SettingRow x:Name="NetworkRow" Header="Connessione" Glyph="&#xE701;">
+                <ComboBox x:Name="NetworkCombo" MinWidth="220" SelectionChanged="OnNetworkChanged">
+                    <ComboBoxItem Content="Automatica (consigliata)" />
+                    <ComboBoxItem Content="Integrata (NAT)" />
+                    <ComboBoxItem Content="Diretta (Npcap)" />
+                </ComboBox>
+            </local:SettingRow>
+            <local:SettingRow x:Name="LanRow" Header="Partite con PC della stessa rete"
+                              Description="Serve a lotte e scambi tra due PC collegati allo stesso router"
+                              Glyph="&#xE968;">
+                <Button x:Name="FirewallButton" Content="Consenti nel firewall" Click="OnAllowFirewall" />
+            </local:SettingRow>
+            <local:SettingRow Header="Log di rete"
+                              Description="Un riepilogo del traffico di ogni partita online, utile se lotte o scambi si interrompono"
+                              Glyph="&#xE9D9;">
+                <Button Content="Apri cartella" Click="OnOpenNetworkLogs" />
+            </local:SettingRow>
+            <local:SettingRow Header="DNS primario" Description="Server WFC alternativo usato dai giochi online" Glyph="&#xE968;">
+                <TextBox x:Name="PrimaryDnsBox" Width="180" LostFocus="OnDnsChanged" />
+            </local:SettingRow>
+            <local:SettingRow Header="DNS secondario" Glyph="&#xE968;">
+                <TextBox x:Name="SecondaryDnsBox" Width="180" LostFocus="OnDnsChanged" />
+            </local:SettingRow>
+
+            <!-- Storage -->
+            <TextBlock Text="Archiviazione" Style="{StaticResource SectionHeaderStyle}" />
+            <local:SettingRow x:Name="CacheRow" Header="ROM in cache" Glyph="&#xEDA2;">
+                <Button Content="Svuota cache" Click="OnClearCache" />
+            </local:SettingRow>
+            <local:SettingRow Header="Cartella dati" Description="Cache, backup dei salvataggi e stati salvati" Glyph="&#xE8B7;">
+                <Button Content="Apri cartella" Click="OnOpenDataFolder" />
+            </local:SettingRow>
+
+            <!-- About -->
+            <TextBlock Text="Informazioni" Style="{StaticResource SectionHeaderStyle}" />
+            <Border Style="{StaticResource CardBorderStyle}" Padding="16" CornerRadius="{StaticResource ControlCornerRadius}">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="VersionText" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <TextBlock TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="Emulazione basata su melonDS (GPLv3). Interfaccia WinUI 3 con Fluent Design." />
+                    <TextBlock x:Name="CoreStatusText" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
