@@ -30,6 +30,7 @@
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
 
+                    <InfoBar x:Name="UpdateBar" />
                     <InfoBar x:Name="ErrorBar" Severity="Error" IsClosable="True" />
 
                     <TextBox x:Name="ServerBox" Header="Server" PlaceholderText="http://localhost:3000"

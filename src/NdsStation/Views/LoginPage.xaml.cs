@@ -18,6 +18,7 @@ public sealed partial class LoginPage : Page
     public LoginPage()
     {
         InitializeComponent();
+        UpdateBanner.Attach(UpdateBar);
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)

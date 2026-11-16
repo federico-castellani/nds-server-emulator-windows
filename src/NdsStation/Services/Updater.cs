@@ -133,14 +133,18 @@ public sealed class Updater
     /// <summary>
     /// Runs the setup silently and closes the app. The setup keeps the install location and
     /// mode of the current installation and starts NDS Station again when done (/RELAUNCH).
+    /// Call it with no dialog open: the app closes through its main window, the same path
+    /// as the close button (which shuts the emulator core down cleanly).
     /// </summary>
     public static void InstallAndExit(string setupPath)
     {
-        Process.Start(new ProcessStartInfo(setupPath, "/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RELAUNCH")
+        // The setup's log sits next to it, for when an update does not go through.
+        var log = Path.Combine(Path.GetDirectoryName(setupPath)!, "setup.log");
+        Process.Start(new ProcessStartInfo(setupPath, $"/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /RELAUNCH \"/LOG={log}\"")
         {
             UseShellExecute = true,
         });
-        Microsoft.UI.Xaml.Application.Current.Exit();
+        App.MainWindow.Close();
     }
 
     public static void OpenReleasePage(UpdateInfo info) =>

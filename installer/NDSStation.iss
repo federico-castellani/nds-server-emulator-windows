@@ -1,9 +1,9 @@
 ; Installer for NDS Station (Inno Setup 6). Built by build.ps1 -Installer, which passes
 ; the version and the folder produced by dotnet publish:
-;   ISCC.exe /DAppVersion=2.1.0 /DSourceDir=..\dist\NDSStation installer\NDSStation.iss
+;   ISCC.exe /DAppVersion=2.1.1 /DSourceDir=..\dist\NDSStation installer\NDSStation.iss
 
 #ifndef AppVersion
-  #define AppVersion "2.1.0"
+  #define AppVersion "2.1.1"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\dist\NDSStation"
@@ -46,7 +46,9 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 LZMAUseSeparateProcess=yes
 ; Close a running copy through the Restart Manager instead of failing on locked files.
-CloseApplications=yes
+; force: also ends what Restart Manager cannot close politely, e.g. the error reporter
+; left behind by NDS Station 2.1.0, which crashed while closing itself for an update.
+CloseApplications=force
 RestartApplications=no
 
 [Languages]

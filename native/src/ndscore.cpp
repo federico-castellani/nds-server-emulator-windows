@@ -37,6 +37,16 @@ constexpr int kFramePixels = NDSCORE_SCREEN_WIDTH * NDSCORE_SCREEN_HEIGHT;
 
 struct Core
 {
+    // The frontend should call ndscore_shutdown first. If the process ends without it
+    // (Application.Exit, an unhandled exception), destroying a joinable std::thread would
+    // call std::terminate and turn a normal exit into a crash: let the threads go instead,
+    // the OS ends them with the process.
+    ~Core()
+    {
+        if (emuThread.joinable()) emuThread.detach();
+        if (padThread.joinable()) padThread.detach();
+    }
+
     bool initialized = false;
 
     // Console; guarded by emuMutex while the emulation thread runs a frame.

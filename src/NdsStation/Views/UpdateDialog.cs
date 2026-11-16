@@ -38,6 +38,7 @@ public static partial class UpdateDialog
         };
 
         using var cts = new CancellationTokenSource();
+        string? downloaded = null;
         dialog.CloseButtonClick += (_, _) => cts.Cancel();
         dialog.PrimaryButtonClick += async (_, args) =>
         {
@@ -62,7 +63,8 @@ public static partial class UpdateDialog
                         status.Text = $"Download in corso… {p:P0}";
                     }), cts.Token);
                 status.Text = "Installazione in corso: NDS Station si riaprirà tra poco.";
-                Updater.InstallAndExit(path);
+                downloaded = path;
+                dialog.Hide();
             }
             catch (OperationCanceledException)
             {
@@ -87,6 +89,7 @@ public static partial class UpdateDialog
         };
 
         await dialog.ShowAsync();
+        if (downloaded is not null) Updater.InstallAndExit(downloaded);
     }
 
     /// <summary>Release notes are Markdown; shown as plain text.</summary>

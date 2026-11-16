@@ -3,7 +3,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Navigation;
-using NdsStation.Services;
 
 namespace NdsStation.Views;
 
@@ -12,6 +11,7 @@ public sealed partial class ShellPage : Page
     public ShellPage()
     {
         InitializeComponent();
+        UpdateBanner.Attach(UpdateBar);
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -28,28 +28,6 @@ public sealed partial class ShellPage : Page
             ContentFrame.Navigate(typeof(LibraryPage));
         }
 
-        App.Updater.Found += OnUpdateFound;
-        if (App.Updater.Available is { } update) ShowUpdate(update);
-        _ = App.Updater.CheckInBackgroundAsync();
-    }
-
-    protected override void OnNavigatedFrom(NavigationEventArgs e)
-    {
-        base.OnNavigatedFrom(e);
-        App.Updater.Found -= OnUpdateFound;
-    }
-
-    private void OnUpdateFound(UpdateInfo info) => DispatcherQueue.TryEnqueue(() => ShowUpdate(info));
-
-    private void ShowUpdate(UpdateInfo info)
-    {
-        UpdateBar.Message = $"NDS Station {info.Version} è pronto (in uso: {Updater.CurrentVersion}).";
-        UpdateBar.IsOpen = true;
-    }
-
-    private async void OnUpdate(object sender, RoutedEventArgs e)
-    {
-        if (App.Updater.Available is { } info) await UpdateDialog.ShowAsync(XamlRoot, info);
     }
 
     private void OnSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)

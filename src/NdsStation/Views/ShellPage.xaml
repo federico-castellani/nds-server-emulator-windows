@@ -54,12 +54,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <InfoBar x:Name="UpdateBar" Severity="Informational" IsOpen="False" Margin="16,8,16,0"
-                     Title="Aggiornamento disponibile">
-                <InfoBar.ActionButton>
-                    <Button Content="Aggiorna" Click="OnUpdate" />
-                </InfoBar.ActionButton>
-            </InfoBar>
+            <InfoBar x:Name="UpdateBar" Margin="16,8,16,0" />
             <Frame x:Name="ContentFrame" Grid.Row="1" />
         </Grid>
     </NavigationView>

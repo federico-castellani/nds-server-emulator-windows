@@ -33,6 +33,8 @@ public partial class App : Application
     {
         Settings = AppSettings.Load();
         Api.BaseUrl = SafeUrl(Settings.ServerUrl);
+        // Independent of the server and of signing in: an update may be what fixes either.
+        _ = Updater.CheckInBackgroundAsync();
 
         try
         {
