@@ -38,6 +38,7 @@ public sealed partial class SettingsPage : Page
         PadLayoutCombo.SelectedIndex = (int)Settings.PadLayout;
         FastForwardCombo.SelectedItem = FastForwardCombo.Items.Cast<ComboBoxItem>()
             .FirstOrDefault(i => float.Parse((string)i.Tag) == Settings.FastForwardSpeed) ?? FastForwardCombo.Items[1];
+        FastForwardSoundCombo.SelectedIndex = (int)Settings.FastForwardSound;
         PrimaryDnsBox.Text = Settings.PrimaryDns;
         SecondaryDnsBox.Text = Settings.SecondaryDns;
 
@@ -113,6 +114,14 @@ public sealed partial class SettingsPage : Page
         if (_initializing || FastForwardCombo.SelectedItem is not ComboBoxItem item) return;
         Settings.FastForwardSpeed = float.Parse((string)item.Tag);
         Settings.Save();
+    }
+
+    private void OnFastForwardSoundChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_initializing || FastForwardSoundCombo.SelectedIndex < 0) return;
+        Settings.FastForwardSound = (NdsCore.FastForwardSound)FastForwardSoundCombo.SelectedIndex;
+        Settings.Save();
+        if (App.CoreAvailable) NdsCore.SetFastForwardAudio(Settings.FastForwardSound);
     }
 
     private void OnPadLayoutChanged(object sender, SelectionChangedEventArgs e)

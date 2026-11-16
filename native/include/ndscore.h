@@ -16,7 +16,7 @@
 #define NDS_API NDS_EXTERN __declspec(dllimport)
 #endif
 
-#define NDSCORE_API_VERSION 3
+#define NDSCORE_API_VERSION 4
 
 #define NDSCORE_SCREEN_WIDTH 256
 #define NDSCORE_SCREEN_HEIGHT 192
@@ -86,6 +86,9 @@ NDS_API void ndscore_set_paused(int32_t paused);
 // 1.0 = normal speed, >1 = fast forward (audio muted), 0 = unlimited.
 NDS_API void ndscore_set_speed(float multiplier);
 NDS_API void ndscore_set_volume(float volume); // 0..1
+// Sound while running faster than real time (see FastForwardAudio.h):
+// 0 = original pitch (default), 1 = sped up, 2 = muted.
+NDS_API void ndscore_set_fast_forward_audio(int32_t mode);
 
 NDS_API void ndscore_set_input(uint32_t pressed_mask);
 NDS_API void ndscore_set_touch(int32_t down, int32_t x, int32_t y);

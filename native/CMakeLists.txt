@@ -24,6 +24,7 @@ add_subdirectory(${MELONDS_DIR}/src/net melonDS-net EXCLUDE_FROM_ALL)
 
 add_library(ndscore SHARED
     src/ndscore.cpp
+    src/FastForwardAudio.cpp
     src/Platform.cpp
     src/SlirpDriver.cpp
 )
@@ -37,6 +38,7 @@ set_target_properties(ndscore PROPERTIES PREFIX "" OUTPUT_NAME "ndscore")
 target_link_options(ndscore PRIVATE -static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic)
 
 # Network regression test (not part of the normal build): cmake --build build --target nettest
+add_executable(fftest EXCLUDE_FROM_ALL tests/fftest.cpp src/FastForwardAudio.cpp)
 add_executable(nettest EXCLUDE_FROM_ALL tests/nettest.cpp src/SlirpDriver.cpp src/Platform.cpp)
 target_include_directories(nettest PRIVATE include ${MELONDS_DIR}/src ${MELONDS_DIR}/src/net)
 target_compile_definitions(nettest PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)

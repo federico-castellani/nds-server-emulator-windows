@@ -45,6 +45,13 @@
                     <ComboBoxItem Content="Illimitata" Tag="0" />
                 </ComboBox>
             </local:SettingRow>
+            <local:SettingRow Header="Audio in avanti veloce" Description="Tono normale: suoni e voci restano naturali, la musica avanza a salti" Glyph="&#xE767;">
+                <ComboBox x:Name="FastForwardSoundCombo" MinWidth="180" SelectionChanged="OnFastForwardSoundChanged">
+                    <ComboBoxItem Content="Tono normale" />
+                    <ComboBoxItem Content="Accelerato" />
+                    <ComboBoxItem Content="Muto" />
+                </ComboBox>
+            </local:SettingRow>
 
             <!-- Controls -->
             <TextBlock Text="Controlli" Style="{StaticResource SectionHeaderStyle}" />

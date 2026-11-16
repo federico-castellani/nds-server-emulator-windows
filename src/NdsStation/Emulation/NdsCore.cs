@@ -8,7 +8,7 @@ public static unsafe partial class NdsCore
 {
     private const string Dll = "ndscore.dll";
 
-    public const int ApiVersion = 3;
+    public const int ApiVersion = 4;
     public const int ScreenWidth = 256;
     public const int ScreenHeight = 192;
     public const int FrameBytes = ScreenWidth * ScreenHeight * 2 * 4;
@@ -32,6 +32,9 @@ public static unsafe partial class NdsCore
     public enum NetMode { None = 0, Slirp = 1, PCap = 2 }
 
     public enum NetPreference { Auto = 0, Builtin = 1, Direct = 2 }
+
+    /// <summary>Sound while fast-forwarding.</summary>
+    public enum FastForwardSound { NormalPitch = 0, SpedUp = 1, Mute = 2 }
 
     [LibraryImport(Dll, EntryPoint = "ndscore_api_version")]
     public static partial int GetApiVersion();
@@ -62,6 +65,9 @@ public static unsafe partial class NdsCore
 
     [LibraryImport(Dll, EntryPoint = "ndscore_set_volume")]
     public static partial void SetVolume(float volume);
+
+    [LibraryImport(Dll, EntryPoint = "ndscore_set_fast_forward_audio")]
+    public static partial void SetFastForwardAudio(FastForwardSound mode);
 
     [LibraryImport(Dll, EntryPoint = "ndscore_set_input")]
     public static partial void SetInput(uint pressedMask);

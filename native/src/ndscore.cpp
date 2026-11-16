@@ -24,6 +24,7 @@
 
 #include "ndscore.h"
 #include "CoreHooks.h"
+#include "FastForwardAudio.h"
 #include "SlirpDriver.h"
 
 using namespace melonDS;
@@ -72,6 +73,11 @@ struct Core
     int audioFrequency = 48000;
     std::mutex audioMutex;
     std::condition_variable audioCv;
+    // Fast-forward: the emulation thread hands every frame's sound to ffAudio (the SPU
+    // buffer only holds ~40 ms), and the callback plays it time-compressed.
+    ndscore::FastForwardAudio ffAudio;
+    std::atomic<int32_t> ffSound{static_cast<int32_t>(ndscore::FastForwardSound::NormalPitch)};
+    bool ffActive = false;   // audio thread only
 
     std::thread padThread;
     std::atomic<bool> padThreadRun{false};
@@ -100,26 +106,47 @@ void SetError(const std::string& message)
 
 // --- Audio -----------------------------------------------------------------
 
+// Fast-forward sound is a little quieter: it keeps the atmosphere and tells the player
+// the game is not running normally.
+constexpr float kFastForwardVolume = 0.6f;
+
 void AudioCallback(void*, Uint8* stream, int len)
 {
     const int frames = len / 4;
+    auto* samples = reinterpret_cast<s16*>(stream);
+    const float speed = g_core.speed.load();
+    float volume = g_core.volume.load();
+    const auto ffSound = static_cast<ndscore::FastForwardSound>(g_core.ffSound.load());
+    const bool playing = g_core.running && !g_core.paused;
+    const bool fast = playing && speed != 1.0f;
+    if (fast != g_core.ffActive)
+    {
+        g_core.ffActive = fast;
+        g_core.ffAudio.Reset();
+    }
+
     int read = 0;
+    if (fast && ffSound != ndscore::FastForwardSound::Mute)
+    {
+        // The emulation thread drains the SPU into ffAudio; play the compressed stream.
+        read = g_core.ffAudio.Pull(samples, frames, speed, ffSound);
+        volume *= kFastForwardVolume;
+    }
+    else
     {
         std::lock_guard lock(g_core.audioMutex);
-        if (g_core.nds && g_core.running && !g_core.paused)
-            read = g_core.nds->SPU.ReadOutput(reinterpret_cast<s16*>(stream), frames);
+        if (g_core.nds && playing)
+            read = g_core.nds->SPU.ReadOutput(samples, frames);
+        if (fast) read = 0;   // muted fast-forward: drained and dropped
     }
     g_core.audioCv.notify_one();
 
-    const float speed = g_core.speed.load();
-    const float volume = g_core.volume.load();
-    if (read <= 0 || volume <= 0.001f || speed != 1.0f)
+    if (read <= 0 || volume <= 0.001f)
     {
         std::memset(stream, 0, len);
         return;
     }
 
-    auto* samples = reinterpret_cast<s16*>(stream);
     if (volume < 0.999f)
     {
         for (int i = 0; i < read * 2; i++)
@@ -145,6 +172,7 @@ void OpenAudio()
     {
         g_core.audioBufferSamples = have.samples;
         g_core.audioFrequency = have.freq;
+        g_core.ffAudio.SetSampleRate(have.freq);
         SDL_PauseAudioDevice(g_core.audioDevice, 0);
     }
 }
@@ -425,6 +453,15 @@ void EmuThreadMain()
 
             nds.RunFrame();
             CopyFramebuffers();
+
+            if (g_core.speed.load() != 1.0f &&
+                g_core.ffSound.load() != static_cast<int32_t>(ndscore::FastForwardSound::Mute))
+            {
+                s16 chunk[2 * 1024];
+                int n;
+                while ((n = nds.SPU.ReadOutput(chunk, 1024)) > 0)
+                    g_core.ffAudio.Push(chunk, n);
+            }
         }
 
         framesInWindow++;
@@ -998,6 +1035,7 @@ NDS_API void ndscore_set_paused(int32_t paused)
 
 NDS_API void ndscore_set_speed(float multiplier) { g_core.speed = std::max(0.0f, multiplier); }
 NDS_API void ndscore_set_volume(float volume) { g_core.volume = std::clamp(volume, 0.0f, 1.0f); }
+NDS_API void ndscore_set_fast_forward_audio(int32_t mode) { g_core.ffSound = std::clamp(mode, 0, 2); }
 
 NDS_API void ndscore_set_input(uint32_t pressed_mask) { g_core.inputMask = pressed_mask & 0xFFF; }
 

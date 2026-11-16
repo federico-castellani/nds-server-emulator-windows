@@ -34,6 +34,7 @@ public sealed class AppSettings
     public PadLayout PadLayout { get; set; } = PadLayout.Positional;
     public AppTheme Theme { get; set; } = AppTheme.System;
     public float FastForwardSpeed { get; set; } = 3.0f;
+    public NdsCore.FastForwardSound FastForwardSound { get; set; } = NdsCore.FastForwardSound.NormalPitch;
 
     public NdsCore.NetPreference Network { get; set; } = NdsCore.NetPreference.Auto;
     public string PrimaryDns { get; set; } = "178.62.43.212";

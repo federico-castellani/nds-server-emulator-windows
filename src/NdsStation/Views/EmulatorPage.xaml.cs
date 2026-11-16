@@ -225,6 +225,7 @@ public sealed partial class EmulatorPage : Page
     private bool Boot(byte[] rom, byte[]? save)
     {
         NdsCore.SetVolume((float)Settings.Volume);
+        NdsCore.SetFastForwardAudio(Settings.FastForwardSound);
         NdsCore.SetSpeed(1);
         NdsCore.SetNetwork(Settings.Network);
         // An existing console keeps its own MAC address; the account-derived one is only
