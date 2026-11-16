@@ -1,9 +1,9 @@
 ; Installer for NDS Station (Inno Setup 6). Built by build.ps1 -Installer, which passes
 ; the version and the folder produced by dotnet publish:
-;   ISCC.exe /DAppVersion=2.1.1 /DSourceDir=..\dist\NDSStation installer\NDSStation.iss
+;   ISCC.exe /DAppVersion=2.1.2 /DSourceDir=..\dist\NDSStation installer\NDSStation.iss
 
 #ifndef AppVersion
-  #define AppVersion "2.1.1"
+  #define AppVersion "2.1.2"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\dist\NDSStation"
@@ -102,6 +102,35 @@ Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=
 function RelaunchRequested: Boolean;
 begin
   Result := WizardSilent and (Pos('/RELAUNCH', Uppercase(GetCmdTail)) > 0);
+end;
+
+// An in-app update starts this setup while the app is still closing. NDS Station 2.1.0
+// even crashed while closing, and Windows Error Reporting then holds its files for a few
+// seconds; Restart Manager cannot end it and the silent setup would give up. So wait
+// (at most about 30 s) until no process from the install folder and no error report is left.
+function OldAppStillClosing(const AppDir: String): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -NonInteractive -Command "if (Get-Process NdsStation,WerFault -ErrorAction SilentlyContinue | ' +
+    'Where-Object { $_.ProcessName -eq ''WerFault'' -or $_.Path -like ''' + AppDir + '\*'' }) { exit 1 } else { exit 0 }"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 1);
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Waited: Integer;
+begin
+  Result := '';
+  if not RelaunchRequested then Exit;
+  Waited := 0;
+  while (Waited < 30000) and OldAppStillClosing(WizardDirValue) do
+  begin
+    Sleep(500);
+    Waited := Waited + 1000;   { each check also takes about half a second }
+  end;
+  Log(Format('Waited about %d ms for the previous NDS Station to close.', [Waited]));
 end;
 
 function IsUpgradeOfThisApp: Boolean;
