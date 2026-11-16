@@ -146,13 +146,18 @@ SlirpAddressing SlirpAddressing::ForLan(uint32_t lanIp, uint16_t relayPort)
     return a;
 }
 
+// The home network address: the one other players' devices can reach. Only Ethernet and
+// Wi-Fi adapters with a default gateway qualify, which leaves out VPN tunnels (WireGuard,
+// Wintun and most others are "virtual" adapters) and host-only switches such as Hyper-V's
+// Default Switch. A full-tunnel VPN is the route to the Internet, so the best route alone
+// is not enough: it only breaks ties between qualifying adapters, then the lowest metric.
 uint32_t SlirpAddressing::DetectLanAddress()
 {
     sockaddr_in probe {};
     probe.sin_family = AF_INET;
     probe.sin_addr.s_addr = htonl(0x08080808);
-    DWORD ifIndex = 0;
-    if (GetBestInterfaceEx(reinterpret_cast<sockaddr*>(&probe), &ifIndex) != NO_ERROR) return 0;
+    DWORD bestIf = 0;
+    GetBestInterfaceEx(reinterpret_cast<sockaddr*>(&probe), &bestIf);
 
     ULONG size = 16 * 1024;
     std::unique_ptr<char[]> buffer;
@@ -160,22 +165,38 @@ uint32_t SlirpAddressing::DetectLanAddress()
     do
     {
         buffer = std::make_unique<char[]>(size);
-        status = GetAdaptersAddresses(AF_INET, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER,
+        status = GetAdaptersAddresses(AF_INET,
+                                      GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_GATEWAYS,
                                       nullptr, reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.get()), &size);
     } while (status == ERROR_BUFFER_OVERFLOW);
     if (status != NO_ERROR) return 0;
 
+    uint32_t chosen = 0;
+    bool chosenIsBest = false;
+    ULONG chosenMetric = ~0UL;
     for (auto* a = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.get()); a; a = a->Next)
     {
-        if (a->IfIndex != ifIndex) continue;
-        for (auto* u = a->FirstUnicastAddress; u; u = u->Next)
+        if (a->OperStatus != IfOperStatusUp || !a->FirstGatewayAddress) continue;
+        if (a->IfType != IF_TYPE_ETHERNET_CSMACD && a->IfType != IF_TYPE_IEEE80211) continue;
+
+        uint32_t ip = 0;
+        for (auto* u = a->FirstUnicastAddress; u && !ip; u = u->Next)
         {
             if (u->Address.lpSockaddr->sa_family != AF_INET) continue;
-            const uint32_t ip = ntohl(reinterpret_cast<sockaddr_in*>(u->Address.lpSockaddr)->sin_addr.s_addr);
-            if ((ip >> 16) != 0xA9FE) return ip;   // skip 169.254.x.x link-local
+            const uint32_t candidate = ntohl(reinterpret_cast<sockaddr_in*>(u->Address.lpSockaddr)->sin_addr.s_addr);
+            if ((candidate >> 16) != 0xA9FE) ip = candidate;   // skip 169.254.x.x link-local
+        }
+        if (!ip) continue;
+
+        const bool isBest = a->IfIndex == bestIf;
+        if (!chosen || (isBest && !chosenIsBest) || (isBest == chosenIsBest && a->Ipv4Metric < chosenMetric))
+        {
+            chosen = ip;
+            chosenIsBest = isBest;
+            chosenMetric = a->Ipv4Metric;
         }
     }
-    return 0;
+    return chosen;
 }
 
 // --- Driver ----------------------------------------------------------------------------

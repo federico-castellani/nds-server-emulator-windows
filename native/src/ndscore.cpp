@@ -82,6 +82,7 @@ struct Core
     std::unique_ptr<Net> net;
     std::atomic<int32_t> netMode{NDSCORE_NET_NONE};
     int32_t netPreference = -1;
+    uint32_t netLanIp = 0;   // home network address the integrated network was built for
     std::mutex netDescriptionMutex;
     std::string netDescription;
 
@@ -272,14 +273,14 @@ void SetNetDescription(std::string text)
 // gets an address from the router and behaves exactly like a real DS, which is the
 // most reliable setup for peer-to-peer. Injecting frames with a foreign MAC only works
 // on wired Ethernet, though: Wi-Fi access points drop them. Everything else uses Slirp.
-void ConfigureNetwork(int32_t preference)
+void ConfigureNetwork(int32_t preference, bool rebuild = false)
 {
     if (!g_core.net)
     {
         g_core.net = std::make_unique<Net>();
         g_core.net->RegisterInstance(0);
     }
-    if (preference == g_core.netPreference && g_core.netMode != NDSCORE_NET_NONE) return;
+    if (!rebuild && preference == g_core.netPreference && g_core.netMode != NDSCORE_NET_NONE) return;
     g_core.netPreference = preference;
 
     auto enqueue = [](const u8* data, int len) {
@@ -348,6 +349,7 @@ void ConfigureNetwork(int32_t preference)
         return;
     }
     const auto& addr = slirp->Addressing();
+    g_core.netLanIp = addr.lanIp;
     auto IpText = [](uint32_t ip) {
         char text[16];
         snprintf(text, sizeof(text), "%u.%u.%u.%u", ip >> 24, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
@@ -903,6 +905,12 @@ NDS_API int32_t ndscore_boot(const ndscore_boot_args* args)
     }
 
     ndscore_unload();
+
+    // The PC may have changed network since the app started (a VPN connected or dropped,
+    // another Wi-Fi): the console's address and the LAN relay must follow it, or players
+    // on the same network cannot reach each other.
+    if (g_core.netMode != NDSCORE_NET_PCAP && ndscore::SlirpAddressing::DetectLanAddress() != g_core.netLanIp)
+        ConfigureNetwork(g_core.netPreference < 0 ? NDSCORE_NETPREF_AUTO : g_core.netPreference, true);
 
     NDSArgs ndsArgs;
     ndsArgs.OutputSampleRate = g_core.audioFrequency;

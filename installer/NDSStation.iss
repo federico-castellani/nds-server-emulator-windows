@@ -1,9 +1,9 @@
 ; Installer for NDS Station (Inno Setup 6). Built by build.ps1 -Installer, which passes
 ; the version and the folder produced by dotnet publish:
-;   ISCC.exe /DAppVersion=2.0.1 /DSourceDir=..\dist\NDSStation installer\NDSStation.iss
+;   ISCC.exe /DAppVersion=2.0.2 /DSourceDir=..\dist\NDSStation installer\NDSStation.iss
 
 #ifndef AppVersion
-  #define AppVersion "2.0.1"
+  #define AppVersion "2.0.2"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\dist\NDSStation"
