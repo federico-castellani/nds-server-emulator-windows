@@ -132,6 +132,7 @@ Il server finto implementa tutti gli endpoint e serve due ROM homebrew generate 
 | GET | `/games` | libreria |
 | GET | `/roms/{id}.nds` | download ROM |
 | GET / POST | `/saves?gameId=` / `/saves` | download e upload del salvataggio (multipart `gameId`, `saveFile`) |
+| GET / POST | `/console` | identità della console (firmware con l'ID WFC) condivisa tra i dispositivi dell'account |
 | GET | `/users/search?q=` | ricerca utenti |
 | GET | `/admin/users` | elenco utenti |
 | DELETE | `/admin/users/{id}` | elimina utente |

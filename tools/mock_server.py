@@ -29,6 +29,7 @@ games = {
     "3": {"id": 3, "name": "Gioco senza ROM", "rom": None},
 }
 saves = {}  # (user_id, game_id) -> bytes
+consoles = {}  # user_id -> firmware bytes
 
 
 def make_token(user):
@@ -58,6 +59,7 @@ def parse_multipart(body, content_type):
 
 
 class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"   # keep-alive like uvicorn; every response sets Content-Length
     def _send(self, status, payload=None, raw=None, content_type="application/json"):
         data = raw if raw is not None else json.dumps(payload).encode()
         self.send_response(status)
@@ -65,6 +67,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+    def _send_empty(self, status):
+        self.send_response(status)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _body(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -83,7 +90,7 @@ class Handler(BaseHTTPRequestHandler):
             with lock:
                 user = next((u for u in users.values() if u["username"] == body.get("username")), None)
             if not user or user["password"] != body.get("password"):
-                return self._send(401, {"error": "Credenziali non valide"})
+                return self._send(200, [{"error": "Invalid username or password"}, 401])
             return self._send(200, {"token": make_token(user), "isAdmin": user["is_admin"],
                                     "mustChangePassword": user["must_change_password"]})
 
@@ -115,7 +122,7 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET" and path == "/saves":
             data = saves.get((user["id"], query.get("gameId", [""])[0]))
             if data is None:
-                return self._send(404, {"error": "Nessun salvataggio"})
+                return self._send_empty(204)
             return self._send(200, raw=data, content_type="application/octet-stream")
 
         if method == "POST" and path == "/saves":
@@ -123,6 +130,21 @@ class Handler(BaseHTTPRequestHandler):
             saves[(user["id"], fields["gameId"].decode())] = fields["saveFile"]
             print(f"  save stored: user={user['username']} game={fields['gameId'].decode()} bytes={len(fields['saveFile'])}")
             return self._send(200, {"ok": True})
+
+        if method == "GET" and path == "/console":
+            data = consoles.get(user["id"])
+            if data is None:
+                return self._send_empty(204)
+            return self._send(200, raw=data, content_type="application/octet-stream")
+
+        if method == "POST" and path == "/console":
+            fields = parse_multipart(self._body(), self.headers["Content-Type"])
+            data = fields.get("firmware", b"")
+            if len(data) not in (128 * 1024, 256 * 1024, 512 * 1024):
+                return self._send(400, {"detail": "Invalid firmware size"})
+            consoles[user["id"]] = data
+            print(f"  console stored: user={user['username']} bytes={len(data)}")
+            return self._send(200, {"success": True})
 
         if method == "GET" and path == "/users/search":
             q = query.get("q", [""])[0].lower()
@@ -161,10 +183,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True})
 
         if method == "POST" and path == "/admin/games":
-            body = json.loads(self._body() or b"{}")
+            if "multipart/form-data" not in self.headers.get("Content-Type", ""):
+                return self._send(422, {"detail": "title form field required"})
+            title = parse_multipart(self._body(), self.headers["Content-Type"]).get("title", b"").decode()
             with lock:
                 gid = str(max(int(k) for k in games) + 1)
-                games[gid] = {"id": int(gid), "name": body["name"], "rom": None}
+                games[gid] = {"id": int(gid), "name": title, "rom": None}
             return self._send(201, {"id": int(gid)})
 
         if method == "POST" and path == "/games":

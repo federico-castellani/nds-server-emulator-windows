@@ -3,12 +3,14 @@ using NdsStation.Services;
 
 namespace NdsStation.Emulation;
 
-public enum SyncState { Synced, Pending, Uploading, Failed }
+public enum SyncState { Synced, Pending, Uploading, Failed, Conflict }
 
 /// <summary>
 /// Keeps the server save in step with the running game. Every write is backed up locally
 /// right away, then uploaded after a short quiet period. Uploads only happen when the
-/// save differs from what the server already has.
+/// save differs from what the server already has, and always name the server version they
+/// replace: if another device saved in the meantime the server refuses (Conflict) and
+/// nothing is overwritten until the player decides.
 /// </summary>
 public sealed class SaveSync : IDisposable
 {
@@ -54,7 +56,10 @@ public sealed class SaveSync : IDisposable
         _debounce?.Cancel();
         _debounce = new CancellationTokenSource();
         var token = _debounce.Token;
-        SetState(SyncState.Pending);
+        // A conflict stays visible (and blocks uploads) until the player resolves it on exit;
+        // writes are still backed up locally.
+        bool conflict = State == SyncState.Conflict;
+        if (!conflict) SetState(SyncState.Pending);
         _ = Task.Run(async () =>
         {
             try
@@ -64,6 +69,7 @@ public sealed class SaveSync : IDisposable
                 if (save is null) return;
                 bool synced = MatchesServer(save);
                 LocalStore.WriteSaveBackup(_gameId, save, pendingUpload: !synced);
+                if (conflict) return;
                 if (synced)
                 {
                     SetState(SyncState.Synced);
@@ -81,11 +87,14 @@ public sealed class SaveSync : IDisposable
     private static readonly TimeSpan BackupDelay = TimeSpan.FromMilliseconds(500);
 
     /// <summary>Uploads the current save if the server does not have it yet.</summary>
-    public async Task<bool> FlushAsync(CancellationToken ct = default)
+    public async Task<bool> FlushAsync(CancellationToken ct = default, bool force = false)
     {
         await _uploadLock.WaitAsync(ct);
         try
         {
+            // After a conflict only the player can decide to overwrite (FlushAsync(force: true)).
+            if (State == SyncState.Conflict && !force) return false;
+
             // A game that never wrote its save has nothing new for the server.
             int generation = Volatile.Read(ref _generation);
             var save = generation != _uploadedGeneration ? NdsCore.GetSave() : null;
@@ -100,7 +109,13 @@ public sealed class SaveSync : IDisposable
             SetState(SyncState.Uploading);
             try
             {
-                await _api.UploadSaveAsync(_gameId, save, ct);
+                await _api.UploadSaveAsync(_gameId, save, _serverHash is null ? null : Convert.ToHexString(_serverHash).ToLowerInvariant(), force, ct);
+            }
+            catch (ApiException ex) when (ex.IsConflict)
+            {
+                LastError = "Su un altro dispositivo è stato salvato un progresso più recente di quello da cui è partita questa partita.";
+                SetState(SyncState.Conflict);
+                return false;
             }
             catch (ApiException ex)
             {

@@ -19,4 +19,7 @@ public sealed class ApiException : Exception
     public int? StatusCode { get; }
 
     public bool IsUnauthorized => StatusCode is 401 or 403;
+
+    /// <summary>The server holds a newer version than the one this upload was based on.</summary>
+    public bool IsConflict => StatusCode == 409;
 }

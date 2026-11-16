@@ -36,6 +36,7 @@ public sealed partial class EmulatorPage : Page
     private ulong _frameId;
     private uint _saveCounter;
     private uint _firmwareCounter;
+    private byte[]? _firmware;
     private bool _running;
     private bool _paused;
     private bool _touching;
@@ -90,10 +91,12 @@ public sealed partial class EmulatorPage : Page
         {
             var romTask = LoadRomAsync(ct);
             var saveTask = LoadServerSaveAsync(ct);
+            var firmwareTask = ConsoleIdentity.ResolveAsync(App.Api, ct);
             var rom = await romTask;
             OverlayText.Text = "Download del salvataggio…";
             OverlayProgress.IsIndeterminate = true;
             var (serverSave, serverSaveOk) = await saveTask;
+            _firmware = await firmwareTask;
 
             var save = await ChooseSaveAsync(serverSave, serverSaveOk);
             if (save is null)
@@ -224,16 +227,18 @@ public sealed partial class EmulatorPage : Page
         NdsCore.SetVolume((float)Settings.Volume);
         NdsCore.SetSpeed(1);
         NdsCore.SetNetwork(Settings.Network);
+        // An existing console keeps its own MAC address; the account-derived one is only
+        // for a brand new console.
         bool ok = NdsCore.Boot(rom, save, _game.Id, Settings.Username,
             ParseIp(Settings.PrimaryDns), ParseIp(Settings.SecondaryDns),
-            LocalStore.ReadFirmware(), LocalStore.ConsoleMac);
+            _firmware, _firmware is null ? LocalStore.ConsoleMac : new byte[6]);
         if (ok)
         {
             _saveCounter = NdsCore.GetSaveCounter();
             _firmwareCounter = NdsCore.GetFirmwareCounter();
-            // Keep the firmware from the first boot too, so the MAC address and profile
+            // Keep a new console's firmware right away, so its MAC address and profile
             // stay the same even before the console ever writes to it.
-            if (LocalStore.ReadFirmware() is null) SaveFirmware();
+            if (_firmware is null) SaveFirmware();
             _frameId = 0;
             _paused = false;
         }
@@ -245,11 +250,7 @@ public sealed partial class EmulatorPage : Page
 
     private static void SaveFirmware()
     {
-        try
-        {
-            if (NdsCore.GetFirmware() is byte[] firmware) LocalStore.WriteFirmware(firmware);
-        }
-        catch (IOException) { }
+        if (NdsCore.GetFirmware() is byte[] firmware) ConsoleIdentity.Save(App.Api, firmware);
     }
 
     private void SaveNetworkLog()
@@ -309,18 +310,31 @@ public sealed partial class EmulatorPage : Page
             if (_sync is not null)
             {
                 _sync.CancelPending();
+                bool force = false;
                 while (true)
                 {
                     ShowOverlay("Sincronizzazione", "Invio del salvataggio al server…", cancellable: false);
-                    if (await _sync.FlushAsync()) break;
+                    if (await _sync.FlushAsync(force: force)) break;
 
-                    var choice = await Dialogs.ShowAsync(XamlRoot, "Salvataggio non inviato",
-                        new TextBlock
-                        {
-                            Text = $"{_sync.LastError}\n\nSe esci ora il salvataggio resta su questo PC e ti verrà proposto alla prossima partita.",
-                            TextWrapping = TextWrapping.Wrap,
-                        },
-                        "Riprova", "Esci comunque", "Torna al gioco");
+                    // Another device saved meanwhile: overwriting would lose that progress,
+                    // so it is the player's call.
+                    bool conflict = _sync.State == SyncState.Conflict;
+                    var choice = conflict
+                        ? await Dialogs.ShowAsync(XamlRoot, "Salvataggio più recente sul server",
+                            new TextBlock
+                            {
+                                Text = $"{_sync.LastError}\n\nPuoi sovrascriverlo con questa partita, oppure uscire senza inviarla: " +
+                                       "resterà su questo PC e ti verrà proposta al prossimo avvio.",
+                                TextWrapping = TextWrapping.Wrap,
+                            },
+                            "Sovrascrivi il server", "Esci senza inviare", "Torna al gioco")
+                        : await Dialogs.ShowAsync(XamlRoot, "Salvataggio non inviato",
+                            new TextBlock
+                            {
+                                Text = $"{_sync.LastError}\n\nSe esci ora il salvataggio resta su questo PC e ti verrà proposto alla prossima partita.",
+                                TextWrapping = TextWrapping.Wrap,
+                            },
+                            "Riprova", "Esci comunque", "Torna al gioco");
 
                     if (choice == ContentDialogResult.Secondary) break;
                     if (choice != ContentDialogResult.Primary)
@@ -329,6 +343,7 @@ public sealed partial class EmulatorPage : Page
                         NdsCore.SetPaused(_paused ? 1 : 0);
                         return false;
                     }
+                    force = conflict;
                 }
             }
 
@@ -685,6 +700,7 @@ public sealed partial class EmulatorPage : Page
             SyncState.Pending => ("", "In attesa", "Modifiche salvate su questo PC, verranno inviate tra poco", Brush("TextFillColorSecondaryBrush")),
             SyncState.Uploading => ("", "Invio…", "Invio del salvataggio al server", Brush("AccentTextFillColorPrimaryBrush")),
             SyncState.Failed => ("", "Non inviato", $"{_sync?.LastError} Il salvataggio è al sicuro su questo PC.", Brush("SystemFillColorCautionBrush")),
+            SyncState.Conflict => ("", "Più recente sul server", $"{_sync?.LastError} Uscendo potrai scegliere quale tenere.", Brush("SystemFillColorCautionBrush")),
             _ => ("", "Sincronizzato", "Il salvataggio sul server è aggiornato", Brush("SystemFillColorSuccessBrush")),
         };
         SyncIcon.Glyph = glyph;

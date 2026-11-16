@@ -154,12 +154,59 @@ public sealed class ApiClient
         return data.Length > 0 ? data : null;
     }
 
-    public async Task UploadSaveAsync(string gameId, byte[] saveData, CancellationToken ct = default)
+    /// <summary>
+    /// Uploads a save "on top of" the version the game started from: <paramref name="basedOn"/>
+    /// is the SHA-256 (hex) of that server save, or null when the server had none. If another
+    /// device saved in the meantime the server refuses with 409 (<see cref="ApiException.IsConflict"/>).
+    /// <paramref name="force"/> overwrites regardless, after the player chose to.
+    /// </summary>
+    public async Task UploadSaveAsync(string gameId, byte[] saveData, string? basedOn, bool force = false, CancellationToken ct = default)
     {
         using var form = new MultipartFormDataContent();
         AddField(form, "gameId", gameId);
         AddFile(form, "saveFile", $"{gameId}.sav", new ByteArrayContent(saveData));
-        using var _ = await SendAsync(HttpMethod.Post, "saves", form, ct);
+        using var _ = await SendAsync(HttpMethod.Post, "saves", form, ct, configure: request =>
+        {
+            if (force) return;
+            if (basedOn is null) request.Headers.TryAddWithoutValidation("If-None-Match", "*");
+            else request.Headers.TryAddWithoutValidation("If-Match", $"\"{basedOn}\"");
+        });
+    }
+
+    // --- Console identity ---------------------------------------------------
+    // The account's DS firmware (Wi-Fi settings and Nintendo WFC user ID), shared by all
+    // the user's devices so games see one console instead of offering to erase friends.
+
+    /// <summary>
+    /// The firmware the server keeps for this account, or null when it has none yet.
+    /// Supported is false on servers without the /console endpoint.
+    /// </summary>
+    public async Task<(bool Supported, byte[]? Firmware)> GetConsoleAsync(CancellationToken ct = default)
+    {
+        using var request = CreateRequest(HttpMethod.Get, "console", null, authenticated: true);
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.SendAsync(request, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new ApiException("Impossibile contattare il server. Controlla la connessione e l'indirizzo.", null, ex);
+        }
+        using (response)
+        {
+            if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed) return (false, null);
+            await EnsureSuccessAsync(response, ct);
+            var data = await response.Content.ReadAsByteArrayAsync(ct);
+            return (true, data.Length > 0 ? data : null);
+        }
+    }
+
+    public async Task UploadConsoleAsync(byte[] firmware, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        AddFile(form, "firmware", "console.bin", new ByteArrayContent(firmware));
+        using var _ = await SendAsync(HttpMethod.Post, "console", form, ct);
     }
 
     // --- Users --------------------------------------------------------------
@@ -207,8 +254,10 @@ public sealed class ApiClient
 
     public async Task AddGameTitleAsync(string name, CancellationToken ct = default)
     {
-        var body = new JsonObject { ["name"] = name };
-        using var _ = await SendAsync(HttpMethod.Post, "admin/games", JsonContent(body), ct);
+        // The server reads a form field named "title" here.
+        using var form = new MultipartFormDataContent();
+        AddField(form, "title", name);
+        using var _ = await SendAsync(HttpMethod.Post, "admin/games", form, ct);
     }
 
     public async Task UploadGameAsync(string name, string romPath, IProgress<double>? progress, CancellationToken ct = default)
@@ -231,9 +280,11 @@ public sealed class ApiClient
     }
 
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, HttpContent? content,
-        CancellationToken ct, bool authenticated = true, HttpCompletionOption completion = HttpCompletionOption.ResponseContentRead)
+        CancellationToken ct, bool authenticated = true, HttpCompletionOption completion = HttpCompletionOption.ResponseContentRead,
+        Action<HttpRequestMessage>? configure = null)
     {
         using var request = CreateRequest(method, path, content, authenticated);
+        configure?.Invoke(request);
         HttpResponseMessage response;
         try
         {
@@ -270,7 +321,8 @@ public sealed class ApiClient
         try
         {
             var text = await response.Content.ReadAsStringAsync(ct);
-            if (JsonNode.Parse(text) is JsonObject obj && obj["error"] is JsonNode err)
+            // {"error": "..."} from the original server, {"detail": "..."} from FastAPI.
+            if (JsonNode.Parse(text) is JsonObject obj && (obj["error"] ?? obj["detail"]) is JsonValue err)
                 message = err.ToString();
         }
         catch (JsonException) { }
@@ -307,7 +359,16 @@ public sealed class ApiClient
     {
         var text = await response.Content.ReadAsStringAsync(ct);
         if (string.IsNullOrWhiteSpace(text)) return null;
-        try { return JsonNode.Parse(text) as JsonObject; }
+        try
+        {
+            return JsonNode.Parse(text) switch
+            {
+                JsonObject obj => obj,
+                // The server answers a failed login with [{"error": ...}, 401].
+                JsonArray { Count: > 0 } array when array[0] is JsonObject first => first,
+                _ => null,
+            };
+        }
         catch (JsonException) { return null; }
     }
 
