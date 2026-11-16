@@ -37,6 +37,8 @@ L'interfaccia è in C#; tutto ciò che dipende dalle prestazioni gira nella DLL 
   - se il salvataggio del server non si scarica, il gioco non parte da vuoto, per non sovrascriverlo.
 - **Amministrazione**: caricamento ROM con barra di avanzamento (il titolo viene suggerito dal banner), creazione utenti con password temporanea generata, reimpostazione password, eliminazione utenti.
 - **Online**: il DNS WFC è configurabile (predefinito `178.62.43.212`). Vedi [Rete e lotte/scambi online](#rete-e-lottescambi-online).
+- **Aggiornamenti**: all'avvio controlla le release di questo repository; il setup viene scaricato, verificato (SHA-256) e installato in silenzio, poi l'app si riapre. La copia portatile apre invece la pagina della release.
+- **Avanti veloce con audio**: il suono resta al tono originale (la musica avanza a salti); in alternativa accelerato o muto.
 
 ## Rete e lotte/scambi online
 

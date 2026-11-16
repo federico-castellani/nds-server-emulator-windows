@@ -39,6 +39,8 @@ public sealed partial class SettingsPage : Page
         FastForwardCombo.SelectedItem = FastForwardCombo.Items.Cast<ComboBoxItem>()
             .FirstOrDefault(i => float.Parse((string)i.Tag) == Settings.FastForwardSpeed) ?? FastForwardCombo.Items[1];
         FastForwardSoundCombo.SelectedIndex = (int)Settings.FastForwardSound;
+        AutoUpdateToggle.IsOn = Settings.CheckForUpdates;
+        ShowUpdateState();
         PrimaryDnsBox.Text = Settings.PrimaryDns;
         SecondaryDnsBox.Text = Settings.SecondaryDns;
 
@@ -113,6 +115,49 @@ public sealed partial class SettingsPage : Page
     {
         if (_initializing || FastForwardCombo.SelectedItem is not ComboBoxItem item) return;
         Settings.FastForwardSpeed = float.Parse((string)item.Tag);
+        Settings.Save();
+    }
+
+    private void ShowUpdateState(string? message = null)
+    {
+        var available = App.Updater.Available;
+        UpdateRow.Description = message ?? (available is null
+            ? $"In uso: {Updater.CurrentVersion}"
+            : $"In uso: {Updater.CurrentVersion} · disponibile: {available.Version}");
+        UpdateButton.Content = available is null ? "Controlla aggiornamenti" : $"Aggiorna a {available.Version}";
+    }
+
+    private async void OnCheckUpdates(object sender, RoutedEventArgs e)
+    {
+        if (App.Updater.Available is { } known)
+        {
+            await UpdateDialog.ShowAsync(XamlRoot, known);
+            return;
+        }
+
+        UpdateButton.IsEnabled = false;
+        UpdateRing.IsActive = true;
+        try
+        {
+            var found = await App.Updater.CheckAsync();
+            ShowUpdateState(found is null ? $"Hai già l'ultima versione ({Updater.CurrentVersion})." : null);
+            if (found is not null) await UpdateDialog.ShowAsync(XamlRoot, found);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or UpdateException)
+        {
+            ShowUpdateState("Controllo non riuscito: verifica la connessione a Internet.");
+        }
+        finally
+        {
+            UpdateButton.IsEnabled = true;
+            UpdateRing.IsActive = false;
+        }
+    }
+
+    private void OnAutoUpdateToggled(object sender, RoutedEventArgs e)
+    {
+        if (_initializing) return;
+        Settings.CheckForUpdates = AutoUpdateToggle.IsOn;
         Settings.Save();
     }
 

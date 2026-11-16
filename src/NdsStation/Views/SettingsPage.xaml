@@ -134,6 +134,17 @@
             </local:SettingRow>
 
             <!-- About -->
+            <TextBlock Text="Aggiornamenti" Style="{StaticResource SectionHeaderStyle}" />
+            <local:SettingRow x:Name="UpdateRow" Header="Versione" Glyph="&#xE895;">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <ProgressRing x:Name="UpdateRing" IsActive="False" Width="20" Height="20" />
+                    <Button x:Name="UpdateButton" Content="Controlla aggiornamenti" Click="OnCheckUpdates" />
+                </StackPanel>
+            </local:SettingRow>
+            <local:SettingRow Header="Controlla all'avvio" Description="Cerca una nuova versione ogni volta che apri NDS Station" Glyph="&#xE823;">
+                <ToggleSwitch x:Name="AutoUpdateToggle" Toggled="OnAutoUpdateToggled" />
+            </local:SettingRow>
+
             <TextBlock Text="Informazioni" Style="{StaticResource SectionHeaderStyle}" />
             <Border Style="{StaticResource CardBorderStyle}" Padding="16" CornerRadius="{StaticResource ControlCornerRadius}">
                 <StackPanel Spacing="4">

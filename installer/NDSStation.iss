@@ -1,9 +1,9 @@
 ; Installer for NDS Station (Inno Setup 6). Built by build.ps1 -Installer, which passes
 ; the version and the folder produced by dotnet publish:
-;   ISCC.exe /DAppVersion=2.0.2 /DSourceDir=..\dist\NDSStation installer\NDSStation.iss
+;   ISCC.exe /DAppVersion=2.1.0 /DSourceDir=..\dist\NDSStation installer\NDSStation.iss
 
 #ifndef AppVersion
-  #define AppVersion "2.0.2"
+  #define AppVersion "2.1.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\dist\NDSStation"
@@ -13,7 +13,7 @@
 #define AppExe "NdsStation.exe"
 #define AppPublisher "Federico Castellani"
 #define FirewallRule "NDS Station (rete locale)"
-#define AppUrl "https://github.com/federico-castellani/nds-server-emulator-desktop"
+#define AppUrl "https://github.com/federico-castellani/nds-server-emulator-windows"
 
 [Setup]
 ; Keep AppId stable forever: it is how upgrades find the previous installation.
@@ -89,12 +89,19 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""{#FirewallRule}"""; Flags: runhidden; Tasks: firewall
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""{#FirewallRule}"" dir=in action=allow program=""{app}\{#AppExe}"" protocol=UDP localport=28950 remoteip=localsubnet profile=any enable=yes"; Flags: runhidden; Tasks: firewall
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; In-app updates run the setup silently with /RELAUNCH: start the app again afterwards.
+Filename: "{app}\{#AppExe}"; Flags: nowait runasoriginaluser; Check: RelaunchRequested
 Filename: "https://npcap.com/#download"; Description: "{cm:OpenNpcap}"; Flags: shellexec postinstall skipifsilent unchecked; Check: not NpcapInstalled
 
 [UninstallRun]
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""{#FirewallRule}"""; Flags: runhidden; RunOnceId: "RemoveFirewallRule"; Check: IsAdminInstallMode
 
 [Code]
+function RelaunchRequested: Boolean;
+begin
+  Result := WizardSilent and (Pos('/RELAUNCH', Uppercase(GetCmdTail)) > 0);
+end;
+
 function IsUpgradeOfThisApp: Boolean;
 begin
   Result := FileExists(ExpandConstant('{app}\{#AppExe}')) and

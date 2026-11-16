@@ -18,6 +18,8 @@ public partial class App : Application
 
     public static ApiClient Api { get; } = new();
 
+    public static Updater Updater { get; } = new();
+
     public static AppSettings Settings { get; private set; } = new();
 
     public static MainWindow MainWindow { get; private set; } = null!;
