@@ -50,23 +50,42 @@ public sealed class ApiClient
     /// <summary>Reads admin flags from the JWT payload, as the server may omit them elsewhere.</summary>
     public static bool TokenSaysAdmin(string? token)
     {
-        if (string.IsNullOrEmpty(token)) return false;
+        if (TokenClaims(token) is not { } json) return false;
+        foreach (var key in new[] { "is_admin", "isAdmin", "role" })
+        {
+            if (json.TryGetPropertyValue(key, out var value)) return IsTruthy(value);
+        }
+        return false;
+    }
+
+    /// <summary>The account id in the token, which (unlike the username) never changes.</summary>
+    public static int? TokenUserId(string? token)
+    {
+        if (TokenClaims(token) is not { } json) return null;
+        foreach (var key in new[] { "user_id", "userId", "id" })
+        {
+            if (json.TryGetPropertyValue(key, out var value) && value is JsonValue v &&
+                (v.TryGetValue<int>(out var id) || (v.TryGetValue<string>(out var text) && int.TryParse(text, out id))))
+                return id;
+        }
+        return null;
+    }
+
+    /// <summary>The (unverified) claims of a JWT; the server checks the signature.</summary>
+    private static JsonObject? TokenClaims(string? token)
+    {
+        if (string.IsNullOrEmpty(token)) return null;
         var parts = token.Split('.');
-        if (parts.Length != 3) return false;
+        if (parts.Length != 3) return null;
         try
         {
             var payload = parts[1].Replace('-', '+').Replace('_', '/');
             payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
-            var json = JsonNode.Parse(Convert.FromBase64String(payload)) as JsonObject;
-            if (json is null) return false;
-            foreach (var key in new[] { "is_admin", "isAdmin", "role" })
-            {
-                if (json.TryGetPropertyValue(key, out var value)) return IsTruthy(value);
-            }
+            return JsonNode.Parse(Convert.FromBase64String(payload)) as JsonObject;
         }
         catch (FormatException) { }
         catch (JsonException) { }
-        return false;
+        return null;
     }
 
     // --- Auth ---------------------------------------------------------------
@@ -248,6 +267,43 @@ public sealed class ApiClient
     {
         var body = new JsonObject { ["new_password"] = newPassword, ["must_change_password"] = true };
         using var _ = await SendAsync(HttpMethod.Post, $"admin/users/{id}/reset-password", JsonContent(body), ct);
+    }
+
+    /// <summary>Renames a user; they are signed out and sign in again with the new name.</summary>
+    public async Task RenameUserAsync(int id, string username, CancellationToken ct = default)
+    {
+        var body = new JsonObject { ["username"] = username };
+        using var _ = await SendAsync(HttpMethod.Patch, $"admin/users/{id}", JsonContent(body), ct);
+    }
+
+    public async Task<IReadOnlyList<AdminSave>> GetUserSavesAsync(int id, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, $"admin/users/{id}/saves", null, ct);
+        var array = await ReadArrayAsync(response, "saves", ct);
+        return array.OfType<JsonObject>()
+            .Select(s => new AdminSave(
+                ReadId(s["gameId"]),
+                s["title"]?.GetValue<string>() ?? "",
+                ReadInt(s["size"]),
+                DateTimeOffset.TryParse(s["updatedAt"]?.GetValue<string>(), out var at) ? at : null))
+            .ToList();
+    }
+
+    public async Task<byte[]> DownloadUserSaveAsync(int id, string gameId, CancellationToken ct = default)
+    {
+        using var response = await SendAsync(HttpMethod.Get, $"admin/users/{id}/saves/{Uri.EscapeDataString(gameId)}", null, ct);
+        return await response.Content.ReadAsByteArrayAsync(ct);
+    }
+
+    /// <summary>Replaces (or creates) a player's save; returns the size the server stored.</summary>
+    public async Task<long> ReplaceUserSaveAsync(int id, string gameId, string fileName, byte[] data, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        AddField(form, "gameId", gameId);
+        AddFile(form, "saveFile", fileName, new ByteArrayContent(data));
+        using var response = await SendAsync(HttpMethod.Post, $"admin/users/{id}/saves", form, ct);
+        var json = await ReadJsonObjectAsync(response, ct);
+        return json?["size"] is { } size ? ReadInt(size) : data.Length;
     }
 
     // --- Library management -------------------------------------------------

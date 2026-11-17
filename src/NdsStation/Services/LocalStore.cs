@@ -15,11 +15,51 @@ public static class LocalStore
     private static string _scope = "default";
     private static byte[] _scopeHash = new byte[32];
 
-    public static void SetScope(string serverUrl, string username)
+    /// <summary>
+    /// Selects the account whose files are used: per server and account id, so renaming the
+    /// account changes nothing here. Versions before 2.2 kept them per username: the folders
+    /// of the name just used to sign in (so of this same account) are moved over once.
+    /// Without an id (a server that does not send one) the username is still used.
+    /// </summary>
+    public static void SetScope(string serverUrl, int? userId, string username)
     {
-        var raw = $"{serverUrl.Trim().TrimEnd('/').ToLowerInvariant()}|{username.Trim().ToLowerInvariant()}";
-        _scopeHash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw));
-        _scope = Convert.ToHexString(_scopeHash)[..16].ToLowerInvariant();
+        var server = serverUrl.Trim().TrimEnd('/').ToLowerInvariant();
+        var legacy = Scope($"{server}|{username.Trim().ToLowerInvariant()}");
+        if (userId is null)
+        {
+            (_scopeHash, _scope) = legacy;
+            return;
+        }
+
+        // A newline cannot be part of a username, so this never matches a username scope.
+        (_scopeHash, _scope) = Scope($"{server}\nid={userId}");
+        MoveScope(legacy.Name, _scope);
+    }
+
+    private static (byte[] Hash, string Name) Scope(string raw)
+    {
+        var hash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw));
+        return (hash, Convert.ToHexString(hash)[..16].ToLowerInvariant());
+    }
+
+    private static void MoveScope(string from, string to)
+    {
+        try
+        {
+            foreach (var area in new[] { Path.Combine("cache", "roms"), "saves", "states" })
+            {
+                var source = Path.Combine(Root, area, from);
+                var target = Path.Combine(Root, area, to);
+                if (Directory.Exists(source) && !Directory.Exists(target)) Directory.Move(source, target);
+            }
+            var firmware = Path.Combine(Root, "firmware", from + ".bin");
+            var newFirmware = Path.Combine(Root, "firmware", to + ".bin");
+            if (File.Exists(firmware) && !File.Exists(newFirmware)) File.Move(firmware, newFirmware);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Left where it is: the data is not lost, only not visible to this account.
+        }
     }
 
     private static string RomDir => Path.Combine(Root, "cache", "roms", _scope);

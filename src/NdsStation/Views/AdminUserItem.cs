@@ -10,7 +10,9 @@ public sealed class AdminUserItem
     public AdminUserItem(AdminUser user)
     {
         User = user;
-        IsSelf = string.Equals(user.Username, App.Settings.Username, StringComparison.OrdinalIgnoreCase);
+        IsSelf = ApiClient.TokenUserId(App.Api.Token) is { } self
+            ? self == user.Id
+            : string.Equals(user.Username, App.Settings.Username, StringComparison.OrdinalIgnoreCase);
     }
 
     public AdminUser User { get; }

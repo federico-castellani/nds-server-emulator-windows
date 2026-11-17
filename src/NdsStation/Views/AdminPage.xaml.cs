@@ -211,6 +211,53 @@ public sealed partial class AdminPage : Page
         }
     }
 
+    private async void OnUserSaves(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is AdminUserItem item) await UserSavesDialog.ShowAsync(XamlRoot, item.User);
+    }
+
+    private async void OnRenameUser(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not AdminUserItem item) return;
+
+        var nameBox = new TextBox { Header = "Nuovo nome utente", Text = item.User.Username, IsSpellCheckEnabled = false, MaxLength = 50 };
+        var content = new StackPanel { Spacing = 12, MinWidth = 340 };
+        content.Children.Add(new TextBlock
+        {
+            Text = item.IsSelf
+                ? "Dopo il cambio dovrai accedere di nuovo con il nuovo nome."
+                : $"{item.User.Username} verrà disconnesso e dovrà accedere con il nuovo nome. Salvataggi, console e amici restano invariati.",
+            TextWrapping = TextWrapping.Wrap,
+        });
+        content.Children.Add(nameBox);
+        nameBox.Loaded += (_, _) => { nameBox.Focus(FocusState.Programmatic); nameBox.SelectAll(); };
+
+        if (await Dialogs.ShowAsync(XamlRoot, "Cambia nome utente", content, "Rinomina") != ContentDialogResult.Primary) return;
+        var newName = nameBox.Text.Trim();
+        if (newName.Length == 0 || newName == item.User.Username) return;
+
+        try
+        {
+            await App.Api.RenameUserAsync(item.User.Id, newName);
+        }
+        catch (ApiException ex)
+        {
+            Dialogs.Show(UsersBar, ex.StatusCode == 409 ? $"Il nome “{newName}” è già in uso." : ex.Message, title: "Rinomina non riuscita");
+            return;
+        }
+
+        if (item.IsSelf)
+        {
+            // This session ended with the rename: sign in again, with the new name filled in.
+            App.Settings.Username = newName;
+            ShellPage.SignOut($"Il tuo nome utente ora è “{newName}”: accedi di nuovo.");
+            return;
+        }
+        Dialogs.Show(UsersBar, $"“{item.User.Username}” ora si chiama “{newName}”: dovrà accedere di nuovo con il nuovo nome.",
+            InfoBarSeverity.Success);
+        await LoadUsersAsync();
+    }
+
     private async void OnDeleteUser(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.Tag is not AdminUserItem item) return;

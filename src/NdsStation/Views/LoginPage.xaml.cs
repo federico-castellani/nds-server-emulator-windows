@@ -158,7 +158,7 @@ public sealed partial class LoginPage : Page
     private void EnterApp()
     {
         if (!App.Settings.IsAdmin && ApiClient.TokenSaysAdmin(App.Api.Token)) App.Settings.IsAdmin = true;
-        LocalStore.SetScope(App.Api.BaseUrl, App.Settings.Username);
+        LocalStore.SetScope(App.Api.BaseUrl, ApiClient.TokenUserId(App.Api.Token), App.Settings.Username);
         App.MainWindow.NavigateRoot(typeof(ShellPage));
         App.MainWindow.ClearRootHistory();
     }

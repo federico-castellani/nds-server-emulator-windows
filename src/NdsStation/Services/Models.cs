@@ -6,6 +6,9 @@ public sealed record AdminUser(int Id, string Username, bool IsAdmin, bool MustC
 
 public sealed record SearchUser(int Id, string Username);
 
+/// <summary>A player's save as the admin sees it.</summary>
+public sealed record AdminSave(string GameId, string Title, long Size, DateTimeOffset? UpdatedAt);
+
 public sealed record LoginResult(string Token, bool MustChangePassword, bool IsAdmin);
 
 public sealed class ApiException : Exception

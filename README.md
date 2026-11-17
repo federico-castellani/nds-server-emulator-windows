@@ -35,7 +35,7 @@ L'interfaccia è in C#; tutto ciò che dipende dalle prestazioni gira nella DLL 
   - uscendo, o chiudendo la finestra, l'app aspetta che il server abbia ricevuto il salvataggio; se l'invio fallisce chiede se riprovare, uscire comunque o tornare al gioco;
   - un salvataggio rimasto solo in locale viene riproposto alla partita successiva;
   - se il salvataggio del server non si scarica, il gioco non parte da vuoto, per non sovrascriverlo.
-- **Amministrazione**: caricamento ROM con barra di avanzamento (il titolo viene suggerito dal banner), creazione utenti con password temporanea generata, reimpostazione password, eliminazione utenti.
+- **Amministrazione**: caricamento ROM con barra di avanzamento (il titolo viene suggerito dal banner), creazione utenti con password temporanea generata, reimpostazione password, cambio del nome utente, eliminazione utenti. Per ogni giocatore si possono scaricare i salvataggi o sostituirli con un file .sav (anche esportato da DeSmuME o da un altro emulatore).
 - **Online**: il DNS WFC è configurabile (predefinito `178.62.43.212`). Vedi [Rete e lotte/scambi online](#rete-e-lottescambi-online).
 - **Aggiornamenti**: all'avvio controlla le release di questo repository; il setup viene scaricato, verificato (SHA-256) e installato in silenzio, poi l'app si riapre. La copia portatile apre invece la pagina della release.
 - **Avanti veloce con audio**: il suono resta al tono originale (la musica avanza a salti); in alternativa accelerato o muto.
@@ -139,6 +139,9 @@ Il server finto implementa tutti gli endpoint e serve due ROM homebrew generate 
 | GET | `/admin/users` | elenco utenti |
 | DELETE | `/admin/users/{id}` | elimina utente |
 | POST | `/admin/users/{id}/reset-password` | reimposta password |
+| PATCH | `/admin/users/{id}` | cambia nome utente (l'utente deve accedere di nuovo) |
+| GET | `/admin/users/{id}/saves`, `/admin/users/{id}/saves/{gameId}` | salvataggi di un giocatore: elenco e download |
+| POST | `/admin/users/{id}/saves` | sostituisce il salvataggio di un giocatore con un file .sav (multipart `gameId`, `saveFile`) |
 | POST | `/admin/games` | aggiunge solo il titolo |
 | POST | `/games` | carica una ROM (multipart `gameName`, `ndsFile`) |
 
